@@ -1,238 +1,384 @@
-# Service Price Calculator API
+# Dynamic Service Price Calculator API
+# سیستم محاسبه پویای قیمت خدمات
 
-A Flask-based REST API for calculating service prices with MariaDB/MySQL storage using Peewee ORM. This application provides endpoints for calculating prices based on various parameters and stores both input and output data in a MySQL database with connection pooling.
+A flexible REST API for calculating service prices with dynamic parameters and rules stored in MySQL database. This system allows administrators to define various parameters and their effects on price calculation, supporting multipliers, fixed amounts, and quantity-based modifications.
 
-در این رابط شما شما باید سه ورودی نوع سرویس، تعداد و اولویت را بعنوان ورودی ارائه کنید و در پاسخ قیمت محاسبه شده را دریافت نمایید. تمام پاسخ ها با یک شناسه در پاسخ برمیگردند و با همان شناسه هم مجددا در دسترس خواهند بود! 
-<br/>
-متغیر multiplier تعیین کننده ضریب در محاسبات است.
-<br/>
-
+یک API انعطاف‌پذیر برای محاسبه قیمت خدمات با پارامترهای پویا و قوانین ذخیره شده در پایگاه داده MySQL. این سیستم به مدیران امکان می‌دهد پارامترهای مختلف و تأثیر آنها بر محاسبه قیمت را تعریف کنند و از ضرایب، مقادیر ثابت و تغییرات مبتنی بر تعداد پشتیبانی می‌کند.
 ![image](https://github.com/user-attachments/assets/3915e6c8-8a17-4cb6-885a-914033466507)
+## Features | ویژگی‌ها
 
-## Features
+- Dynamic parameter definition | تعریف پویای پارامترها
+- Three types of price modifiers | سه نوع تغییردهنده قیمت:
+  - Percentage-based multipliers | ضرایب درصدی
+  - Fixed amount additions/subtractions | افزودن/کاهش مقادیر ثابت
+  - Quantity-based calculations | محاسبات مبتنی بر تعداد
+- Parameter validation | اعتبارسنجی پارامترها
+- Historical data storage | ذخیره‌سازی تاریخچه محاسبات
+- MySQL connection pooling | استخر اتصالات MySQL
 
-- RESTful API endpoints for price calculations
-- MySQL database integration with connection pooling
-- Flexible parameter handling for price calculations
-- Historical data storage and retrieval
-- Input parameter validation
-- Error handling and logging
-
-## Requirements
+## Requirements | پیش‌نیازها
 
 - Python 3.8+
-- MySQL 8+ (Mariadb preferred)
-- pip (Python package manager)
+- MySQL 5.7+
+- pip (Python package manager | مدیر پکیج پایتون)
 
-## Installation
 
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/price-calculator-api.git
-cd price-calculator-api
-```
-
-2. Create a virtual environment and activate it:
+2. Create virtual environment | ایجاد محیط مجازی:
 ```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-3. Install required packages:
+3. Install requirements | نصب نیازمندی‌ها:
 ```bash
 pip install flask peewee mysqlclient
 ```
 
-4. Set up the MySQL database:
+4. Set up MySQL database | راه‌اندازی پایگاه داده:
 ```sql
 CREATE DATABASE price_calculator;
 CREATE USER 'your_username'@'localhost' IDENTIFIED BY 'your_password';
 GRANT ALL PRIVILEGES ON price_calculator.* TO 'your_username'@'localhost';
 FLUSH PRIVILEGES;
 ```
+5. Set up MySQL configs | تنظیم پایگاه داده:
+After writing your actual parameters on 'config_sample.py' change its name to 'config.py'
 
-5. Update the database configuration in `app.py`:
-```python
-db = PooledMySQLDatabase(
-    'price_calculator',
-    max_connections=32,
-    stale_timeout=300,
-    user='your_username',
-    password='your_password',
-    host='localhost',
-    port=3306
-)
-```
+در فایل config_sample.py مقادیر مرتبط را جاگذاری کنید سپس نام آنرا به config.py تغییر دهید.
+## API Endpoints | نقاط پایانی API
 
-## Usage
+### 1. Parameter Management | مدیریت پارامترها
 
-### Starting the Server
-
-```bash
-python app.py
-```
-
-The server will start on `http://localhost:5000`
-
-### API Endpoints
-
-#### 1. Calculate Price (POST `/calculate-price`)
-
-Calculate and store a new price calculation.
-
-**Request Body:**
+#### Create Parameter (POST `/parameters`)
+Create a new calculation parameter | ایجاد پارامتر جدید محاسبه
 
 ```json
 {
-    "service_type": "premium",  // optional: "premium" or "basic", default: "basic"
-    "quantity": 2,             // optional: positive number, default: 1
-    "urgency": "high"          // optional: "high" or "normal", default: "normal"
+    "name": "service_level",
+    "description": "Level of service",
+    "parameter_type": "multiplier",
+    "is_required": true,
+    "default_value": "basic",
+    "options": [
+        {"value": "basic", "modifier": 1.0},
+        {"value": "premium", "modifier": 1.5},
+        {"value": "enterprise", "modifier": 2.0}
+    ]
 }
 ```
 
-**Mandatory Fields:** None (all fields are optional with defaults)
+#### Get Parameters (GET `/parameters`)
+Retrieve all defined parameters | دریافت تمام پارامترهای تعریف شده
 
-**Response:**
+### 2. Price Calculation | محاسبه قیمت
+
+#### Calculate Price (POST `/calculate-price`)
+
+**Request Body | بدنه درخواست:**
+```json
+{
+    "base_price": 100,
+    "parameters": {
+        "service_level": "premium",
+        "rush_fee": "next_day",
+        "units": "2"
+    }
+}
+```
+
+**Response | پاسخ:**
 ```json
 {
     "calculation_id": 1,
-    "price": 390.0,
-    "timestamp": "2025-01-05T14:30:00",
+    "base_price": 100.0,
+    "calculated_price": 350.0,
+    "timestamp": "2025-01-11T14:30:00",
     "input_parameters": {
-        "service_type": "premium",
-        "quantity": 2,
-        "urgency": "high"
+        "service_level": "premium",
+        "rush_fee": "next_day",
+        "units": "2"
     }
 }
 ```
 
-#### 2. Get All Calculations (GET `/calculations`)
+## Parameter Types | انواع پارامتر
 
-Retrieve all stored calculations.
-
-**Parameters:** None
-
-**Response:**
-```json
-[
-    {
-        "id": 1,
-        "price": 390.0,
-        "timestamp": "2025-01-05T14:30:00",
-        "input_parameters": {
-            "service_type": "premium",
-            "quantity": 2,
-            "urgency": "high"
-        }
-    },
-    // ... more calculations
-]
-```
-
-#### 3. Get Specific Calculation (GET `/calculation/<id>`)
-
-Retrieve a specific calculation by ID.
-
-**Parameters:** 
-- `id`: The calculation ID (in URL)
-
-**Response:**
+### 1. Multiplier (percentage-based) | ضریب (درصدی)
+- Affects price multiplicatively | تأثیر ضربی روی قیمت
+- Example | مثال: Service level (1.0x, 1.5x, 2.0x)
 ```json
 {
-    "id": 1,
-    "price": 390.0,
-    "timestamp": "2025-01-05T14:30:00",
-    "input_parameters": {
-        "service_type": "premium",
-        "quantity": 2,
-        "urgency": "high"
-    }
+    "name": "service_level",
+    "parameter_type": "multiplier",
+    "options": [
+        {"value": "basic", "modifier": 1.0},
+        {"value": "premium", "modifier": 1.5}
+    ]
 }
 ```
 
-### Price Calculation Rules
-
-The base price is 100 units, modified by the following factors:
-
-1. Service Type:
-   - Premium: 1.5x multiplier
-   - Basic: 1.0x multiplier (default)
-
-2. Quantity:
-   - Multiplied directly by the quantity value
-   - Default: 1
-
-3. Urgency:
-   - High: 1.3x multiplier
-   - Normal: 1.0x multiplier (default)
-
-### Example Requests
-
-1. Basic calculation with all parameters:
-```bash
-curl -X POST http://localhost:5000/calculate-price \
--H "Content-Type: application/json" \
--d '{
-    "service_type": "premium",
-    "quantity": 2,
-    "urgency": "high"
-}'
-```
-
-2. Minimal calculation with defaults:
-```bash
-curl -X POST http://localhost:5000/calculate-price \
--H "Content-Type: application/json" \
--d '{}'
-```
-
-3. Get all calculations:
-```bash
-curl http://localhost:5000/calculations
-```
-
-4. Get specific calculation:
-```bash
-curl http://localhost:5000/calculation/1
-```
-
-## Error Handling
-
-The API returns appropriate HTTP status codes and error messages:
-
-- 400: Bad Request (invalid input)
-- 404: Not Found (calculation not found)
-- 500: Internal Server Error
-
-Example error response:
+### 2. Fixed Amount | مقدار ثابت
+- Adds/subtracts fixed amount | افزودن/کاهش مقدار ثابت
+- Example | مثال: Rush fee (+50, +100)
 ```json
 {
-    "error": "Invalid service type. Must be 'premium' or 'basic'"
+    "name": "rush_fee",
+    "parameter_type": "fixed",
+    "options": [
+        {"value": "none", "modifier": 0},
+        {"value": "next_day", "modifier": 50}
+    ]
 }
 ```
 
-## Database Schema
+### 3. Quantity-based | مبتنی بر تعداد
+- Multiplies by quantity | ضرب در تعداد
+- Example | مثال: Number of units
+```json
+{
+    "name": "units",
+    "parameter_type": "quantity",
+    "options": [
+        {"value": "1", "modifier": 1.0}
+    ]
+}
+```
 
-The application uses a single table with the following structure:
+## Example Usage | مثال استفاده
+
+## 1. Create a Service
+
+**Endpoint:** `POST /services`
+
+### Request Body:
+
+```json
+{
+  "name": "Car Wash",
+  "description": "Car washing service",
+  "base_price": 50
+}
+```
+
+### Description:
+This endpoint allows you to create a new service. You must provide the service name, description, and the base price.
+
+---
+
+## 2. Create a Parameter
+
+**Endpoint:** `POST /parameters`
+
+### Request Body:
+
+```json
+{
+  "service_id": 1,
+  "name": "Car Size",
+  "description": "Size of the car",
+  "parameter_type": "multiplier",
+  "is_required": true,
+  "default_value": "Small",
+  "options": [
+    { "value": "Small", "modifier": 1.0 },
+    { "value": "Large", "modifier": 1.5 }
+  ]
+}
+```
+
+### Description:
+This endpoint allows you to create a parameter for an existing service. In this example, the parameter is `Car Size`, which allows users to select between "Small" or "Large" car sizes, each with a corresponding price modifier.
+
+---
+
+## 3. Calculate Price
+
+**Endpoint:** `POST /calculate-price`
+
+### Request Body:
+
+```json
+{
+  "service_id": 1,
+  "parameters": {
+    "Car Size": "Large",
+    "Waxing": "Yes"
+  }
+}
+```
+
+### Description:
+This endpoint calculates the price for a service based on the provided parameters. You must pass the `service_id` and a set of parameters to get the final price.
+
+--- 
+
+```markdown
+## Price Calculation Logic | منطق محاسبه قیمت
+
+### Overview
+The price calculation logic determines the final price of a service by applying various modifiers (multipliers, fixed values, or quantities) to the base price of the service. This logic is implemented within the `calculate_service_price` function.
+
+### Steps
+
+#### 1. Fetch the Service:
+- Retrieve the service from the database using the `service_id`.
+- Obtain the `base_price` of the service.
+
+#### 2. Initialize Variables:
+- `total_price`: Starts with the `base_price`.
+- `multiplier`: Starts at `1.0` (used for multiplicative modifiers).
+- `fixed_modifiers`: Starts at `0.0` (used for additive modifiers).
+
+#### 3. Process Parameters:
+For each parameter associated with the service:
+- Retrieve the user-provided value, or use the default value if none is provided.
+- If the parameter is required and no value is provided, raise an error.
+- Find the corresponding `ParameterOption` for the provided value.
+- Apply the modifier based on the parameter type:
+  - **Multiplier**: Multiply the `multiplier` by the option's modifier.
+  - **Fixed**: Add the option's modifier to `fixed_modifiers`.
+  - **Quantity**: Multiply the `multiplier` by the option's modifier and the provided quantity.
+
+#### 4. Calculate Final Price:
+- Multiply the `base_price` by the `multiplier`.
+- Add the `fixed_modifiers` to the result.
+- Ensure the final price is not negative (set it to `0.0` if negative).
+
+#### 5. Return the Final Price:
+- Return the calculated price.
+
+### Example Calculation
+
+**Input:**
+- **Service:** Car Wash (`base_price = $50`)
+- **Parameters:**
+  - Car Size: Large (`multiplier = 1.5`)
+  - Waxing: Yes (`fixed_modifier = +$10`)
+
+**Calculation:**
+- `base_price = $50`
+- `multiplier = 1.0 * 1.5 = 1.5` (from Car Size)
+- `fixed_modifiers = $10` (from Waxing)
+- `total_price = ($50 * 1.5) + $10 = $85`
+
+**Output:**
+- **Final Price:** $85
+
+---
+
+### منطق محاسبه قیمت (فارسی)
+
+#### مرور کلی
+منطق محاسبه قیمت، قیمت نهایی یک سرویس را با اعمال تعدیل‌کننده‌ها (ضریب، مقدار ثابت یا مقدار کمی) به قیمت پایه سرویس محاسبه می‌کند. این منطق در تابع `calculate_service_price` پیاده‌سازی شده است.
+
+#### مراحل
+
+##### 1. دریافت سرویس:
+- سرویس را از پایگاه داده با استفاده از `service_id` دریافت کنید.
+- `base_price` سرویس را دریافت کنید.
+
+##### 2. مقداردهی اولیه متغیرها:
+- `total_price`: با `base_price` شروع می‌شود.
+- `multiplier`: با `1.0` شروع می‌شود (برای تعدیل‌کننده‌های ضریبی استفاده می‌شود).
+- `fixed_modifiers`: با `0.0` شروع می‌شود (برای تعدیل‌کننده‌های ثابت استفاده می‌شود).
+
+##### 3. پردازش پارامترها:
+برای هر پارامتر مرتبط با سرویس:
+- مقدار ارائه‌شده توسط کاربر را بازیابی کنید یا در صورت عدم ارائه، از مقدار پیش‌فرض استفاده کنید.
+- اگر پارامتر اجباری است و مقداری ارائه نشده است، یک خطا ایجاد کنید.
+- `ParameterOption` مربوط به مقدار ارائه‌شده را پیدا کنید.
+- تعدیل‌کننده را بر اساس نوع پارامتر اعمال کنید:
+  - **ضریب:** `multiplier` را در تعدیل‌کننده گزینه ضرب کنید.
+  - **ثابت:** تعدیل‌کننده گزینه را به `fixed_modifiers` اضافه کنید.
+  - **مقدار کمی:** `multiplier` را در تعدیل‌کننده گزینه و مقدار ارائه‌شده ضرب کنید.
+
+##### 4. محاسبه قیمت نهایی:
+- `base_price` را در `multiplier` ضرب کنید.
+- `fixed_modifiers` را به نتیجه اضافه کنید.
+- اطمینان از این که قیمت نهایی منفی نباشد (در صورت منفی بودن، آن را `0.0` تنظیم کنید).
+
+##### 5. بازگشت قیمت نهایی:
+- قیمت محاسبه‌شده را بازگردانید.
+
+#### مثال محاسبه
+
+**ورودی:**
+- **سرویس:** کارواش (`base_price = 50 دلار`)
+- **پارامترها:**
+  - اندازه ماشین: بزرگ (`multiplier = 1.5`)
+  - واکس: بله (`fixed_modifier = +10 دلار`)
+
+**محاسبه:**
+- `base_price = 50 دلار`
+- `multiplier = 1.0 * 1.5 = 1.5` (از اندازه ماشین)
+- `fixed_modifiers = 10 دلار` (از واکس)
+- `total_price = (50 دلار * 1.5) + 10 دلار = 85 دلار`
+
+**خروجی:**
+- **قیمت نهایی:** 85 دلار
+```
+
+
+## Error Handling | مدیریت خطا
+
+The API returns appropriate HTTP status codes and error messages | API کدهای وضعیت HTTP و پیام‌های خطای مناسب را برمی‌گرداند:
+
+- 400: Bad Request (invalid parameters) | درخواست نامعتبر (پارامترهای نامعتبر)
+- 404: Not Found | یافت نشد
+- 500: Internal Server Error | خطای داخلی سرور
+
+Example error response | مثال پاسخ خطا:
+```json
+{
+    "error": "Required parameter 'service_level' is missing"
+}
+```
+
+## Database Schema | ساختار پایگاه داده
 
 ```sql
+CREATE TABLE services (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(255) UNIQUE NOT NULL,
+    description TEXT,
+    base_price DECIMAL(10, 2) NOT NULL
+);
+
+CREATE TABLE parameters (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    service_id INT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    parameter_type VARCHAR(50) NOT NULL,
+    is_required BOOLEAN DEFAULT FALSE,
+    default_value VARCHAR(255),
+    FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE CASCADE
+);
+
+CREATE TABLE parameter_options (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    parameter_id INT NOT NULL,
+    value VARCHAR(255) NOT NULL,
+    modifier DECIMAL(10, 4) NOT NULL,
+    FOREIGN KEY (parameter_id) REFERENCES parameters(id) ON DELETE CASCADE
+);
+
 CREATE TABLE price_calculations (
-    id INTEGER PRIMARY KEY AUTO_INCREMENT,
-    timestamp DATETIME NOT NULL,
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    service_id INT NOT NULL,
     input_params TEXT NOT NULL,
-    calculated_price DECIMAL(10,2) NOT NULL
+    calculated_price DECIMAL(10, 2) NOT NULL,
+    base_price DECIMAL(10, 2) NOT NULL,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE CASCADE
 );
 ```
 
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+##Testing
+```pytest test.py -v ```
 
 ## Author
 [Written by Amir Ahmadabadiha](https://linkedin.com/in/amir-ahmadabadiha-259113175)
 
+with https://claude.ai & Copilot helps as my assistants
 
